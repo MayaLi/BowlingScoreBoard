@@ -40,13 +40,13 @@ public class ScoreBoard {
             return;
         }
 
-        if (this.frames.get(this.currentFrameId).hasFinished()) {
-            this.currentFrameId++;
-        }
-
         final Frame currentFrame = this.frames.get(this.currentFrameId);
         currentFrame.recordScore(points);
         tryUpdateLastFrameBonus(currentFrame);
+
+        if (this.frames.get(this.currentFrameId).hasFinished()) {
+            this.currentFrameId++;
+        }
     }
 
     /**
@@ -55,8 +55,7 @@ public class ScoreBoard {
      * @return true when the score board is filled
      */
     public boolean isComplete() {
-        return this.currentFrameId == NUMBER_OF_FRAMES - 1 &&
-                this.frames.get(this.currentFrameId).hasFinished();
+        return this.currentFrameId == NUMBER_OF_FRAMES;
     }
 
     /**
@@ -73,16 +72,24 @@ public class ScoreBoard {
                 .sum();
     }
 
+    public LinkedList<Frame> getFrames() {
+        return this.frames;
+    }
+
+    public int getCurrentFrameId() {
+        return this.currentFrameId;
+    }
+
     private void tryUpdateLastFrameBonus(final Frame currentFrame) {
         final Frame lastFrame = this.currentFrameId >= 1 ? this.frames.get(this.currentFrameId - 1) : null;
         final Frame twoFramesPrior = (this.currentFrameId >= 2) ? this.frames.get(this.currentFrameId - 2) : null;
 
         if (lastFrame != null) {
             lastFrame.setBonus(currentFrame);
-        }
 
-        if (twoFramesPrior != null) {
-            twoFramesPrior.setBonus(lastFrame, currentFrame);
+            if (twoFramesPrior != null) {
+                twoFramesPrior.setBonus(lastFrame, currentFrame);
+            }
         }
     }
 
