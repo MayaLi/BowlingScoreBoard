@@ -96,7 +96,21 @@ public class FrameTest {
     }
 
     @Test
-    public void testRecordScore_shouldSucceedForLastFrame() throws Exception {
+    public void testRecordScoreLastFrame_shouldSucceed() throws Exception {
+        // There is no strike or spare in the first 2 balls of the last frame which should end the frame
+        final Frame frame = new Frame(9);
+
+        frame.recordScore(4);
+        frame.recordScore(5);
+        assertThat(frame.hasFinished()).as("When there is no more spare left").isTrue();
+
+        assertThatThrownBy(() -> frame.recordScore(1))
+                .as("Record score when the frame is finished should receive rexception")
+                .isInstanceOf(FrameIsFullException.class);
+    }
+
+    @Test
+    public void testRecordScoreLastFrame_shouldSucceedWithSpare() throws Exception {
         // There is a spare in the first two balls of last frame
         final Frame frame = new Frame(9);
 
@@ -110,7 +124,7 @@ public class FrameTest {
     }
 
     @Test
-    public void testRecordScore_shouldSucceedForLastFrameWithStrike() throws Exception {
+    public void testRecordScoreLastFrame_shouldSucceedWithStrike() throws Exception {
         // There is a strike in the first ball
         final Frame frame = new Frame(9);
         frame.recordScore(10);
@@ -125,20 +139,111 @@ public class FrameTest {
     }
 
     @Test
-    public void testRecordScore_shouldSucceedForLastFrameWithNoStrike() throws Exception {
+    public void testRecordScoreLastFrame_shouldSucceedWithAllStrikes() throws Exception {
         final Frame frame = new Frame(9);
+        frame.recordScore(10);
+        assertThat(frame.hasFinished()).as("There are more balls for the last frame").isFalse();
 
-        frame.recordScore(1);
-        frame.recordScore(7);
-        assertThat(frame.hasFinished()).as("The last frame with no spare or strike in the first two falls finishes here").isTrue();
+        frame.recordScore(10);
+        assertThat(frame.hasFinished()).as("There are more balls for the last frame").isFalse();
 
-        assertThatThrownBy(() -> frame.recordScore(6))
-                .as("Should not be able to record another score when the last frame is finished")
-                .isInstanceOf(FrameIsFullException.class);
+        frame.recordScore(10);
+        assertThat(frame.hasFinished()).as("There are 3 balls for the final frame").isTrue();
+
+        assertThat(frame.getFrameScore()).as("Total score should be 30")
+                .isPresent()
+                .isEqualTo(Optional.of(30));
+    }
+
+
+    @Test
+    public void testSetBonus_shouldSucceedWithSpare() throws Exception {
+        final Frame frame1 = new Frame(1);
+        final Frame frame2 = new Frame(2);
+        final Frame frame3 = new Frame(3);
+
+        frame1.recordScore(4);
+        frame1.recordScore(6);
+        assertThat(frame1.hasFinished());
+        assertThat(frame1.getFrameScore()).as("Cannot score a spare frame yet").isNotPresent();
+
+        frame2.recordScore(7);
+        assertThat(frame1.isReadyToTally()).isFalse();
+
+        frame1.setBonus(frame2);
+        assertThat(frame1.getFrameScore()).as("Frame1 is ready to score").isPresent()
+                .isEqualTo(Optional.of(17));
+
+        frame2.recordScore(3);
+        assertThat(frame2.hasFinished());
+        assertThat(frame2.getFrameScore()).as("Cannot score a spare frame yet").isNotPresent();
+
+        frame1.setBonus(frame2, frame3);
+        assertThat(frame1.getFrameScore()).as("Frame1 is ready to score").isPresent()
+                .isEqualTo(Optional.of(17));
+
+        frame2.setBonus(frame3);
+        assertThat(frame2.isReadyToTally()).as("Frame2 cannot be tallied until first ball of frame 3 is rolled").isFalse();
+
+        frame3.recordScore(10);
+        frame2.setBonus(frame3);
+        assertThat(frame2.getFrameScore()).as("Frame2 is ready to score").isPresent()
+                .isEqualTo(Optional.of(20));
     }
 
     @Test
-    public void testSetBonus() throws Exception {
+    public void testSetBonus_shouldSucceedWithStrike() throws Exception {
+        final Frame frame1 = new Frame(1);
+        final Frame frame2 = new Frame(2);
 
+        frame1.recordScore(10);
+        assertThat(frame1.hasFinished());
+        assertThat(frame1.getFrameScore()).as("Cannot score a spare frame yet").isNotPresent();
+
+        frame2.recordScore(7);
+        assertThat(frame1.isReadyToTally()).isFalse();
+
+        frame2.recordScore(2);
+        assertThat(frame2.hasFinished());
+        assertThat(frame1.isReadyToTally()).isFalse();
+        assertThat(frame2.isReadyToTally()).isTrue();
+        assertThat(frame2.getFrameScore()).as("Frame 2 is scored").isPresent().isEqualTo(Optional.of(9));
+
+        frame1.setBonus(frame2);
+        assertThat(frame1.isReadyToTally()).isTrue();
+        assertThat(frame1.getFrameScore()).as("Frame1 is ready to score")
+                .isPresent()
+                .isEqualTo(Optional.of(19));
+    }
+
+
+    @Test
+    public void testSetBonus_shouldSucceedWith2Strikes() throws Exception {
+        final Frame frame1 = new Frame(1);
+        final Frame frame2 = new Frame(2);
+        final Frame frame3 = new Frame(3);
+
+        frame1.recordScore(10);
+        frame2.recordScore(10);
+        frame1.setBonus(frame2);
+        assertThat(frame1.hasFinished());
+        assertThat(frame1.isReadyToTally()).isFalse();
+        assertThat(frame2.isReadyToTally()).isFalse();
+
+        frame3.recordScore(10);
+        assertThat(frame1.isReadyToTally()).isFalse();
+
+        frame1.setBonus(frame2);
+        frame1.setBonus(frame2, frame3);
+        frame2.setBonus(frame3);
+        assertThat(frame2.isReadyToTally()).isFalse();
+        assertThat(frame1.isReadyToTally())
+                .as("First of 2 consecutive strikes is ready when the second frame first ball is rolled")
+                .isTrue();
+
+        assertThat(frame1.getFrameScore())
+                .as("First of 2 consecutive strikes accumulate the next frame and the first ball of the 3rd frame")
+                .isPresent()
+                .isEqualTo(Optional.of(30));
     }
 }

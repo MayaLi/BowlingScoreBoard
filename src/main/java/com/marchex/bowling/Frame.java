@@ -10,9 +10,9 @@ import java.util.Optional;
 
 
 public class Frame {
+    private static final int DEFAULT_TOTAL_SCORE = 10;
     private static final int DEFAULT_NUM_BALLS_PER_FRAME = 2;
     private static final int LAST_FRAME_NUMBER = 9;
-    private static final int DEFAULT_TOTAL_SCORE = 10;
     private static final int MAX_BALLS_IN_LAST_FRAME = 3;
 
     private int frameId;
@@ -45,6 +45,8 @@ public class Frame {
      * @param score The score
      */
     public void recordScore(final int score) throws FrameIsFullException, InvalidScoreException {
+        Preconditions.checkArgument(score <= Frame.DEFAULT_TOTAL_SCORE, "You can only add points from 0-10");
+
         if (hasFinished()) {
             throw new FrameIsFullException("The frame with frameId " + this.frameId + " is full");
         }
@@ -52,11 +54,6 @@ public class Frame {
         if (getScore() + score > DEFAULT_TOTAL_SCORE) {
             if (!isLastFrame()) {
                 throw new InvalidScoreException("Cannot add a score that makes the frame blow up beyond 10");
-            } else {
-                // The last frame can only continue to record score if the first two frames earned a strike or a spare
-                if (this.balls.size() == 2 && !(isStrike() || isSpare())) {
-                    throw new InvalidScoreException("Cannot add more score to the last frame");
-                }
             }
         }
 
@@ -149,12 +146,24 @@ public class Frame {
      * @param nextFrame the next frame in the game
      */
     public void setBonus(final Frame nextFrame) {
+        if (!(isSpare() || isStrike()) || isLastFrame()) {
+            return;
+        }
+
         if (nextFrame == null || nextFrame.getFrameId() != this.frameId + 1) {
             return;
         }
 
-        if (isStrike() && nextFrame.isReadyToTally()) {
-            this.bonus = Optional.of(nextFrame.getFrameScore().get());
+        if (isStrike()) {
+            if (!nextFrame.isLastFrame()) {
+                if (!nextFrame.isStrike()) {
+                    this.bonus = Optional.of(nextFrame.getScore());
+                }
+            } else {
+                if (nextFrame.getTwoBallScore().isPresent()) {
+                    this.bonus = Optional.of(nextFrame.getTwoBallScore().get());
+                }
+            }
         }
 
         if (isSpare() && nextFrame.getFirstBallScore().isPresent()) {
@@ -169,6 +178,10 @@ public class Frame {
      * @param nextFrame2 the frame 2 frames from current
      */
     public void setBonus(final Frame nextFrame, final Frame nextFrame2) {
+        if (!(isSpare() || isStrike()) || isLastFrame()) {
+            return;
+        }
+
         if (nextFrame == null || nextFrame.getFrameId() != this.frameId + 1) {
             return;
         }
@@ -198,7 +211,14 @@ public class Frame {
         } else {
             return Optional.empty();
         }
+    }
 
+    public Optional<Integer> getTwoBallScore() {
+        if (this.balls.size() >= 2) {
+            return Optional.of(this.balls.get(0) + this.balls.get(1));
+        } else {
+            return Optional.empty();
+        }
     }
 
     public int getFrameId() {
